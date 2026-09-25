@@ -1,0 +1,28 @@
+[project]
+name = "dy-auto"
+version = "0.1.0"
+description = "抖音自动化项目 - 基于 Playwright"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "playwright>=1.48.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-playwright>=0.5.0",
+    "ruff>=0.8.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

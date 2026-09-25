@@ -1,0 +1,58 @@
+# dy-auto 配置文件
+# 复制为 config.yaml 后修改
+
+# 浏览器 / CDP 配置
+browser:
+  # CloakBrowser CDP 端点（替换为你的实际端点）
+  cdp_endpoint: "http://192.168.1.1:8087/api/profiles/YOUR_PROFILE_ID/cdp"
+  # 认证 Token（替换为你的实际 Token）
+  auth_token: "YOUR_AUTH_TOKEN"
+  # 抖音域名
+  douyin_domain: "douyin.com"
+
+# 日志
+logs:
+  # 是否启用日志
+  enabled: true
+  # 是否输出到控制台
+  console: true
+  # 单文件大小上限（字节），默认 1MB
+  max_file_size: 1048576
+  # 日志保留天数（超过自动删除）
+  retention_days: 7
+  # 分类开关
+  categories:
+    online_events: true
+    send_result: true
+    schedule: true
+    session_save: true
+    browser_ops: true
+    status_check: true
+
+# 调度参数（续火花）
+schedule:
+  # 离线用户发送间隔（小时）
+  offline:
+    min_hours: 5
+    max_hours: 10
+  # 在线用户发送间隔（分钟）
+  online:
+    min_minutes: 15
+    max_minutes: 50
+  # 每日全量发送时刻
+  full_send:
+    hour: 0
+    minute: 1
+    tolerance_seconds: 120
+  # 火花还有多少天以内算"即将消失"
+  expiring_days: 3
+  # 火花未续用户上线后的延迟秒数
+  online_delay: 5
+  # 启动时跳过最近 N 小时内已发送过的用户
+  skip_hours: 1
+  # 是否开启上线监控
+  on_online: true
+  # 全量模式用户列表（配置后跳过状态检查，直接搜索发送）
+  # 示例: ["张三", "李四", "王五"]
+  # 留空则从会话列表自动提取
+  full_mode_users: []
