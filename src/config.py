@@ -98,6 +98,8 @@ class ScheduleConfig(BaseModel):
     skip_hours: int = Field(default=1, ge=0, le=24)
     # 是否开启上线监控
     on_online: bool = True
+    # 是否开启下线提醒（仅记录日志）
+    on_offline: bool = True
     # 全量用户列表（指定用户发送，为空则从会话列表自动提取）
     full_mode_users: list[str] = Field(default_factory=list)
 

@@ -52,6 +52,8 @@ schedule:
   skip_hours: 1
   # 是否开启上线监控
   on_online: true
+  # 是否开启下线提醒（仅记录日志到 online_events.log）
+  on_offline: true
   # 全量模式用户列表（配置后跳过状态检查，直接搜索发送）
   # 示例: ["张三", "李四", "王五"]
   # 留空则从会话列表自动提取

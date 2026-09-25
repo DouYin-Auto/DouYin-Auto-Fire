@@ -48,15 +48,20 @@ class UserSchedule:
     def _random_online_interval() -> timedelta:
         return timedelta(seconds=random.randint(ONLINE_MIN_INTERVAL, ONLINE_MAX_INTERVAL))
 
-    def update_online_status(self, online: bool) -> None:
+    def update_online_status(self, online: bool) -> str | None:
         was_offline = not self.is_online
         self.is_online = online
         if online and was_offline:
             self.just_came_online = True
             self.current_interval = self._random_online_interval()
-        elif not online:
+            return "came_online"
+        elif not online and not was_offline:
             self.current_interval = self._random_offline_interval()
             self.just_came_online = False
+            return "went_offline"
+        elif not online:
+            self.just_came_online = False
+        return None
 
     def schedule_next(self, base_time: datetime | None = None) -> None:
         base = base_time or datetime.now()
@@ -262,7 +267,10 @@ class XXHRunner:
                 await asyncio.sleep(1)
 
                 current_targets = {s.name for s in self._filter_targets(statuses)}
+                on_offline = get_config().schedule.on_offline
+
                 online_events: list[str] = []
+                offline_events: list[str] = []
 
                 for s in statuses:
                     if s.name not in current_targets:
@@ -272,10 +280,11 @@ class XXHRunner:
                     sched = self._user_sched[s.name]
                     sched.renewed_today = s.renewed_today
 
-                    was_offline = not sched.is_online
-                    sched.update_online_status(s.is_online)
-                    if s.is_online and was_offline:
+                    change = sched.update_online_status(s.is_online)
+                    if change == "came_online":
                         online_events.append(s.name)
+                    elif change == "went_offline":
+                        offline_events.append(s.name)
 
                 log = get_logger()
                 online_names = [s.name for s in statuses if s.is_online]
@@ -323,6 +332,14 @@ class XXHRunner:
                             log.online_events(
                                 f"{name} 上线（未续），{delay}s后续火花"
                             )
+
+                if on_offline and offline_events:
+                    for name in offline_events:
+                        sched = self._user_sched[name]
+                        if sched.renewed_today_or_pending:
+                            log.online_events(f"{name} 下线（已续/待发），跳过")
+                        else:
+                            log.online_events(f"{name} 下线（未续），已记录提醒")
 
                 due_users = [
                     name for name, sched in self._user_sched.items()
