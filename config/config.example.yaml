@@ -42,7 +42,7 @@ schedule:
   # 每日全量发送时刻
   full_send:
     hour: 0
-    minute: 1
+    minute: 10
     tolerance_seconds: 120
   # 火花还有多少天以内算"即将消失"
   expiring_days: 3

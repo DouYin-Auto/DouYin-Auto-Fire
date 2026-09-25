@@ -7,7 +7,7 @@ import os
 import random
 from datetime import datetime, timedelta
 
-from src.browser_session import BrowserSession
+from src.browser_session import CHAT_URL, BrowserSession
 from src.config import get_config
 from src.logger import get_logger
 from src.online_status import OnlineStatus
@@ -21,6 +21,11 @@ from src.xxh_utils import (
     ONLINE_MAX_INTERVAL,
     ONLINE_MIN_INTERVAL,
 )
+
+# Chat 页面刷新时刻（每天凌晨）
+CHAT_REFRESH_HOUR = 0
+CHAT_REFRESH_MINUTE = 5
+CHAT_REFRESH_TOLERANCE = 120  # 容差秒数
 
 
 class UserSchedule:
@@ -97,6 +102,7 @@ class XXHRunner:
         self.target = target
         self._user_sched: dict[str, UserSchedule] = {}
         self._last_full_send_date: datetime.date | None = None
+        self._last_chat_refresh_date: datetime.date | None = None
         self._sent_this_cycle: set[str] = set()
         self._browser: BrowserSession | None = None
         self._sent_history = SentHistory(douyin_id, hours=get_config().schedule.skip_hours)
@@ -218,10 +224,20 @@ class XXHRunner:
                 now = datetime.now()
 
                 if self._should_full_send(now):
-                    await self._execute_full_send(message, sticker)
-                    self._last_full_send_date = now.date()
-                    for sched in self._user_sched.values():
-                        sched.schedule_next()
+                    sent_ok = await self._execute_full_send(message, sticker)
+                    if sent_ok:
+                        self._last_full_send_date = now.date()
+                        for sched in self._user_sched.values():
+                            sched.schedule_next()
+                        await asyncio.sleep(60)
+                    else:
+                        # chat 页面异常，不标记完成，延后重试
+                        await asyncio.sleep(30)
+                    continue
+
+                if self._should_refresh_chat(now):
+                    await self._refresh_chat_page()
+                    self._last_chat_refresh_date = now.date()
                     await asyncio.sleep(60)
                     continue
 
@@ -343,21 +359,38 @@ class XXHRunner:
         self,
         message: str | None,
         sticker: str | None,
-    ) -> None:
-        """执行每日全量发送。"""
+    ) -> bool:
+        """执行每日全量发送。发送前确保 chat 页面正常。
+
+        Returns:
+            True 表示发送完成，False 表示 chat 页面异常需要延后重试。
+        """
         print(f"\n===== 每日全量续火花 {datetime.now().strftime('%H:%M')} =====")
+
+        # 验证 chat 页面：搜索框 + 用户列表
+        if self._browser and self._browser.is_connected:
+            try:
+                await self._browser._verify_chat_page(self._browser.chat_page)
+                log = get_logger()
+                log.browser_ops("全量发送前 chat 页面验证通过")
+            except RuntimeError as exc:
+                log = get_logger()
+                log.browser_ops(f"全量发送前 chat 页面异常: {exc}，延后重试")
+                print(f"⚠️ chat 页面验证失败，延后重试: {exc}")
+                return False
+
         statuses = await self._browser.get_statuses()
         targets = self._filter_targets(statuses)
         if not targets:
             print("没有需要续火花的用户")
-            return
+            return True
 
         print(f"全量发送 {len(targets)} 人:")
         for friend in targets:
             try:
                 trigger = f"每日全量续火花 时间={datetime.now().strftime('%H:%M')}"
                 await self._browser.send_to(
-                    friend.name, text=message, sticker=sticker, trigger=trigger,
+                    friend.name, text=message, sticker= sticker, trigger=trigger,
                 )
                 self._user_sched[friend.name].mark_sent()
                 self._sent_history.record(friend.name)
@@ -365,6 +398,7 @@ class XXHRunner:
             except Exception as exc:
                 print(f"  ❌ {friend.name}: {exc}")
             await asyncio.sleep(1)
+        return True
 
     def _should_full_send(self, now: datetime) -> bool:
         if self._last_full_send_date == now.date():
@@ -375,6 +409,70 @@ class XXHRunner:
         )
         diff = abs((now - target_time).total_seconds())
         return diff <= FULL_SEND_TOLERANCE
+
+    def _should_refresh_chat(self, now: datetime) -> bool:
+        """判断是否需要刷新 chat 页面（每天一次）。"""
+        if self._last_chat_refresh_date == now.date():
+            return False
+        target_time = now.replace(
+            hour=CHAT_REFRESH_HOUR, minute=CHAT_REFRESH_MINUTE,
+            second=0, microsecond=0,
+        )
+        diff = abs((now - target_time).total_seconds())
+        return diff <= CHAT_REFRESH_TOLERANCE
+
+    async def _refresh_chat_page(self) -> None:
+        """刷新 chat 页面：打开新的 → 走首次打开检查 → 关闭旧的。"""
+        log = get_logger()
+        if not self._browser or not self._browser.is_connected:
+            log.browser_ops("浏览器未连接，跳过 chat 刷新")
+            return
+
+        log.browser_ops("=== 每日刷新 chat 页面 ===")
+        context = self._browser.context
+        if not context:
+            log.browser_ops("浏览器上下文不可用，跳过")
+            return
+
+        # 找到旧的 chat 页面
+        old_chat_page = None
+        for page in context.pages:
+            if CHAT_URL in page.url:
+                old_chat_page = page
+                break
+
+        # 创建新的 chat 标签页
+        new_page = await context.new_page()
+        log.browser_ops(f"新建 chat 标签页，导航到 {CHAT_URL}")
+        await new_page.goto(CHAT_URL, wait_until="domcontentloaded", timeout=15_000)
+        await new_page.bring_to_front()
+
+        try:
+            # 走首次打开检查：验证搜索框 + 用户列表
+            await self._browser._verify_chat_page(new_page)
+            log.browser_ops("新 chat 页面验证通过")
+        except RuntimeError as exc:
+            log.browser_ops(f"新 chat 页面验证失败: {exc}")
+            # 验证失败，关闭新页面，保持旧页面
+            try:
+                await new_page.close()
+            except Exception:
+                pass
+            return
+
+        # 验证通过，关闭旧的 chat 页面
+        if old_chat_page and not old_chat_page.is_closed():
+            try:
+                await old_chat_page.close()
+                log.browser_ops("旧 chat 页面已关闭")
+            except Exception as exc:
+                log.browser_ops(f"关闭旧页面出错: {exc}")
+
+        # 重置 DouyinChat 缓存
+        self._browser.chat = None
+
+        page_count = len(context.pages)
+        log.browser_ops(f"刷新完成，当前 {page_count} 个标签页")
 
     def _filter_targets(self, statuses: list[OnlineStatus]) -> list[OnlineStatus]:
         """筛选目标用户：有火花且未续。"""

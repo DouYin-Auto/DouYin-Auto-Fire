@@ -170,55 +170,14 @@ class BrowserSession:
         await self.chat_page.bring_to_front()
 
         # === 步骤 4: 检查搜索框 + 用户列表 ===
-        for retry in range(MAX_SEARCH_RETRIES):
-            # 1Hz 轮询，最多 120 秒
-            success = False
-            for _ in range(SEARCH_RECOVER_TIMEOUT):
-                check = await self._cdp_eval(self.chat_page, """() => {
-                  const search = document.querySelector('input[placeholder*="搜索"]');
-                  const items = document.querySelectorAll('[data-e2e="conversation-item"]');
-                  return {hasSearch: !!search, itemCount: items.length};
-                }""", label="check_search")
-                if check["hasSearch"] and check["itemCount"] > 0:
-                    success = True
-                    break
-                await self._cdp_esc(self.chat_page)
-                await asyncio.sleep(1)
-
-            if success:
-                break
-
-            # 失败 → 开启新 chat 标签页，关闭旧的
-            if retry < MAX_SEARCH_RETRIES - 1:
-                log.browser_ops(
-                    f"搜索框/用户列表缺失，"
-                    f"开新 chat 标签页（第 {retry + 1}/{MAX_SEARCH_RETRIES} 次）"
-                )
-                old_chat = self.chat_page
-                new_chat = await self.context.new_page()
-                await new_chat.goto(CHAT_URL, wait_until="domcontentloaded", timeout=15_000)
-                await new_chat.bring_to_front()
-                self.chat_page = new_chat
-                try:
-                    await old_chat.close()
-                except Exception:
-                    pass
-
-        # 最终确认
-        check = await self.chat_page.evaluate("""() => {
-          const search = document.querySelector('input[placeholder*="搜索"]');
-          const items = document.querySelectorAll('[data-e2e="conversation-item"]');
-          return {hasSearch: !!search, itemCount: items.length};
-        }""")
-
-        if not check["hasSearch"] or check["itemCount"] == 0:
-            raise RuntimeError(
-                f"搜索框/用户列表无法恢复: search={check['hasSearch']}, "
-                f"items={check['itemCount']}"
-            )
+        await self._verify_chat_page(self.chat_page)
 
         self._connected = True
         self._start_auto_save()
+        check = await self.chat_page.evaluate("""() => {
+          const items = document.querySelectorAll('[data-e2e="conversation-item"]');
+          return {itemCount: items.length};
+        }""")
         log.browser_ops(f"浏览器连接成功，获取 {check['itemCount']} 个会话")
 
     async def _cleanup_tabs(self, keep_one_chat: bool = True) -> None:
@@ -240,6 +199,73 @@ class BrowserSession:
             non_chat = [p for p in self.context.pages if CHAT_URL not in p.url]
             for p in non_chat:
                 await p.close()
+
+    async def _verify_chat_page(self, page: Page) -> None:
+        """验证 chat 页面：搜索框和用户列表能正常加载。
+
+        复用首次打开检查的逻辑，1Hz 轮询搜索框+会话列表，
+        失败则开新标签页关闭旧页，最多重试 MAX_SEARCH_RETRIES 次。
+
+        Args:
+            page: 要验证的 chat 页面。
+
+        Raises:
+            RuntimeError: 搜索框/用户列表无法恢复。
+        """
+        log = get_logger()
+        current_page = page
+
+        for retry in range(MAX_SEARCH_RETRIES):
+            success = False
+            for _ in range(SEARCH_RECOVER_TIMEOUT):
+                check = await self._cdp_eval(current_page, """() => {
+                  const search = document.querySelector('input[placeholder*="搜索"]');
+                  const items = document.querySelectorAll('[data-e2e="conversation-item"]');
+                  return {hasSearch: !!search, itemCount: items.length};
+                }""", label="check_search")
+                if check["hasSearch"] and check["itemCount"] > 0:
+                    success = True
+                    break
+                await self._cdp_esc(current_page)
+                await asyncio.sleep(1)
+
+            if success:
+                break
+
+            # 失败 → 开启新 chat 标签页，关闭旧的
+            if retry < MAX_SEARCH_RETRIES - 1:
+                log.browser_ops(
+                    f"搜索框/用户列表缺失，"
+                    f"开新 chat 标签页（第 {retry + 1}/{MAX_SEARCH_RETRIES} 次）"
+                )
+                old_chat = current_page
+                new_chat = await self.context.new_page()
+                await new_chat.goto(CHAT_URL, wait_until="domcontentloaded", timeout=15_000)
+                await new_chat.bring_to_front()
+                current_page = new_chat
+                try:
+                    await old_chat.close()
+                except Exception:
+                    pass
+
+                # 同步更新 chat_page 引用
+                self.chat_page = new_chat
+
+        # 最终确认
+        check = await current_page.evaluate("""() => {
+          const search = document.querySelector('input[placeholder*="搜索"]');
+          const items = document.querySelectorAll('[data-e2e="conversation-item"]');
+          return {hasSearch: !!search, itemCount: items.length};
+        }""")
+
+        if not check["hasSearch"] or check["itemCount"] == 0:
+            raise RuntimeError(
+                f"搜索框/用户列表无法恢复: search={check['hasSearch']}, "
+                f"items={check['itemCount']}"
+            )
+
+        # 确保引用最终同步
+        self.chat_page = current_page
 
     async def ensure_logged_in(self) -> bool:
         """检查是否仍然登录（搜索框检测）。"""

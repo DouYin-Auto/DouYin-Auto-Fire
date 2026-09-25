@@ -126,7 +126,7 @@ schedule:
     max_minutes: 50       # 在线用户最大间隔
   full_send:
     hour: 0
-    minute: 1             # 每日 00:01 全量发送
+    minute: 10            # 每日 00:10 全量发送
     tolerance_seconds: 120
   expiring_days: 3
   online_delay: 5         # 火花未续用户上线后延迟秒数
@@ -176,6 +176,7 @@ dy-auto/
 │   ├── logger.py                 # 日志系统
 │   ├── constants.py              # 共享常量
 │   ├── cdp_utils.py              # CDP 连接管理
+│   ├── browser_session.py        # 浏览器会话管理
 │   ├── storage_utils.py          # 存储操作
 │   ├── session_utils.py          # Session 读写
 │   ├── dy_utils.py               # 抖音业务工具
@@ -184,7 +185,7 @@ dy-auto/
 │   ├── message_sender.py         # 消息发送 + 状态确认
 │   ├── online_status.py          # 在线状态检测
 │   ├── get_online_status.py      # 状态查询入口
-│   ├── xxh.py                    # 续火花核心逻辑
+│   ├── runner.py                 # 续火花调度器（智能调度 + 页面刷新）
 │   ├── run_xxh.py                # 续火花 CLI 入口
 │   ├── send_message.py           # 自动发送入口
 │   ├── douyin_init_login.py      # 初始化登录
@@ -216,10 +217,18 @@ dy-auto/
 
 ## 调度策略（持续模式）
 
+### 每日定时任务
+
+| 时间 | 任务 | 说明 |
+|------|------|------|
+| 00:05 | 刷新 chat 页面 | 打开新标签页，走首次打开检查验证搜索框+会话列表，验证通过后关闭旧页面。防止长时间运行后页面内存泄漏或状态异常。 |
+| 00:10 | 每日全量续火花 | 发送前必须先验证 chat 页面正常（搜索框 + 用户列表），验证失败则延后重试（每 30 秒重试一次），直到当天 chat 页面恢复正常后完成发送。 |
+
+### 智能调度
+
 | 场景 | 行为 |
 |------|------|
 | 用户上线 + 未续 | 5 秒后发送 |
 | 用户上线 + 已续 | 随机 15-50 分钟后发送 |
 | 未上线用户 | 随机 5-10 小时发送 |
-| 每日 00:01 | 全量发送一次 |
 | 启动时 | 跳过 1 小时内已发送过的用户 |
