@@ -58,8 +58,8 @@ class LogsConfig(BaseModel):
     enabled: bool = True
     console: bool = True
     max_file_size: int = Field(
-        default=1048576, ge=256,
-        description="单文件大小上限（字节），默认 1MB",
+        default=104857600, ge=256,
+        description="单文件大小上限（字节），默认 100MB",
     )
     retention_days: int = Field(
         default=7, ge=1, le=365, description="日志保留天数",

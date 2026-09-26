@@ -16,8 +16,8 @@ logs:
   enabled: true
   # 是否输出到控制台
   console: true
-  # 单文件大小上限（字节），默认 1MB
-  max_file_size: 1048576
+  # 单文件大小上限（字节），默认 100MB
+  max_file_size: 104857600
   # 日志保留天数（超过自动删除）
   retention_days: 7
   # 分类开关
