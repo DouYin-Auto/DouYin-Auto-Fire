@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 
 from src.constants import DOUYIN_DOMAIN, SESSIONS_DIR
+from src.logger import get_logger
 
 
 def load_session(filepath: str) -> dict:
@@ -34,7 +35,7 @@ def save_session(session_data: dict, filepath: str) -> None:
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(session_data, f, ensure_ascii=False, indent=2)
-    print(f"Session 已保存到: {filepath}")
+    get_logger().session_save(f"Session 已保存到: {filepath}")
 
 
 def get_session_filepath(douyin_id: str) -> str:

@@ -6,6 +6,7 @@
 
 from src.constants import DOUYIN_DOMAIN
 from src.dy_utils import _load_js
+from src.logger import get_logger
 
 
 async def clear_storage(page) -> None:
@@ -41,7 +42,7 @@ async def clear_storage(page) -> None:
     if douyin_cookies:
         await page.context.clear_cookies()
 
-    print(f"已清空 {DOUYIN_DOMAIN} 相关存储数据")
+    get_logger().session_save(f"已清空 {DOUYIN_DOMAIN} 相关存储数据")
 
 
 async def dump_cookies(context) -> list[dict]:
@@ -55,7 +56,7 @@ async def dump_cookies(context) -> list[dict]:
     """
     cookies = await context.cookies()
     douyin_cookies = [c for c in cookies if DOUYIN_DOMAIN in c.get("domain", "")]
-    print(f"导出 Cookie: {len(douyin_cookies)} 条")
+    get_logger().session_save(f"导出 Cookie: {len(douyin_cookies)} 条")
     return douyin_cookies
 
 
@@ -69,7 +70,7 @@ async def dump_local_storage(page) -> dict[str, str]:
         LocalStorage 键值对字典。
     """
     data = await page.evaluate(_load_js("dump_local_storage.js"))
-    print(f"导出 LocalStorage: {len(data)} 项")
+    get_logger().session_save(f"导出 LocalStorage: {len(data)} 项")
     return data
 
 
@@ -88,10 +89,10 @@ async def restore_session(page, context, session_data: dict) -> None:
     cookies = session_data.get("cookies", [])
     if cookies:
         await context.add_cookies(cookies)
-        print(f"已恢复 Cookie: {len(cookies)} 条")
+        get_logger().session_save(f"已恢复 Cookie: {len(cookies)} 条")
 
     # 3. 恢复 LocalStorage
     local_storage = session_data.get("local_storage", {})
     if local_storage:
         await page.evaluate(_load_js("restore_local_storage.js"), local_storage)
-        print(f"已恢复 LocalStorage: {len(local_storage)} 项")
+        get_logger().session_save(f"已恢复 LocalStorage: {len(local_storage)} 项")
