@@ -95,6 +95,7 @@ class BrowserSession:
         self._playwright = await self._pw.start()
         self.browser = await connect_cdp_browser(self._playwright)
         self.context = self.browser.contexts[0]
+        log.chat_refresh(f"CDP 连接成功（{len(self.context.pages)} 个标签页）")
 
         # === 步骤 1: 关闭其他标签页，最多保留 1 个 chat ===
         await self._cleanup_tabs(keep_one_chat=True)
@@ -225,6 +226,7 @@ class BrowserSession:
                 }""", label="check_search")
                 if check["hasSearch"] and check["itemCount"] > 0:
                     success = True
+                    log.chat_refresh(f"chat 页面加载完成（搜索框 ✓，{check['itemCount']} 个会话）")
                     break
                 await self._cdp_esc(current_page)
                 await asyncio.sleep(1)
