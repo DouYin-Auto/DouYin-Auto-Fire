@@ -22,12 +22,13 @@ logs:
   retention_days: 7
   # 分类开关
   categories:
-    online_events: true
-    send_result: true
-    schedule: true
-    session_save: true
-    browser_ops: true
-    status_check: true
+    online_events: true     # 上下线提醒
+    send_result: true       # 发送结果
+    schedule: false         # 调度决策（默认关闭）
+    session_save: false     # 默认关闭（暂无调用）
+    browser_ops: false      # 默认关闭（CDP 技术细节）
+    status_check: false     # 在线状态（默认关闭）
+    chat_refresh: true      # 聊天页面刷新/全量发送
 
 # 调度参数（续火花）
 schedule:

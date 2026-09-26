@@ -46,10 +46,11 @@ class LogCategoriesConfig(BaseModel):
     """日志分类开关。"""
     online_events: bool = True
     send_result: bool = True
-    schedule: bool = True
-    session_save: bool = True
-    browser_ops: bool = True
-    status_check: bool = True
+    schedule: bool = False
+    session_save: bool = False
+    browser_ops: bool = False
+    status_check: bool = False
+    chat_refresh: bool = True
 
 
 class LogsConfig(BaseModel):

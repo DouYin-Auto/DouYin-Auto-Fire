@@ -389,10 +389,10 @@ class XXHRunner:
             try:
                 await self._browser._verify_chat_page(self._browser.chat_page)
                 log = get_logger()
-                log.browser_ops("全量发送前 chat 页面验证通过")
+                log.chat_refresh("全量发送前 chat 页面验证通过")
             except RuntimeError as exc:
                 log = get_logger()
-                log.browser_ops(f"全量发送前 chat 页面异常: {exc}，延后重试")
+                log.chat_refresh(f"全量发送前 chat 页面异常: {exc}，延后重试", success=False)
                 print(f"⚠️ chat 页面验证失败，延后重试: {exc}")
                 return False
 
@@ -442,13 +442,13 @@ class XXHRunner:
         """刷新 chat 页面：打开新的 → 走首次打开检查 → 关闭旧的。"""
         log = get_logger()
         if not self._browser or not self._browser.is_connected:
-            log.browser_ops("浏览器未连接，跳过 chat 刷新")
+            log.chat_refresh("浏览器未连接，跳过 chat 刷新", success=False)
             return
 
-        log.browser_ops("=== 每日刷新 chat 页面 ===")
+        log.chat_refresh("=== 每日刷新 chat 页面 ===")
         context = self._browser.context
         if not context:
-            log.browser_ops("浏览器上下文不可用，跳过")
+            log.chat_refresh("浏览器上下文不可用，跳过", success=False)
             return
 
         # 找到旧的 chat 页面
@@ -467,9 +467,9 @@ class XXHRunner:
         try:
             # 走首次打开检查：验证搜索框 + 用户列表
             await self._browser._verify_chat_page(new_page)
-            log.browser_ops("新 chat 页面验证通过")
+            log.chat_refresh("新 chat 页面验证通过")
         except RuntimeError as exc:
-            log.browser_ops(f"新 chat 页面验证失败: {exc}")
+            log.chat_refresh(f"新 chat 页面验证失败: {exc}", success=False)
             # 验证失败，关闭新页面，保持旧页面
             try:
                 await new_page.close()
@@ -483,13 +483,13 @@ class XXHRunner:
                 await old_chat_page.close()
                 log.browser_ops("旧 chat 页面已关闭")
             except Exception as exc:
-                log.browser_ops(f"关闭旧页面出错: {exc}")
+                log.chat_refresh(f"关闭旧页面出错: {exc}", success=False)
 
         # 重置 DouyinChat 缓存
         self._browser.chat = None
 
         page_count = len(context.pages)
-        log.browser_ops(f"刷新完成，当前 {page_count} 个标签页")
+        log.chat_refresh(f"刷新完成，当前 {page_count} 个标签页")
 
     def _filter_targets(self, statuses: list[OnlineStatus]) -> list[OnlineStatus]:
         """筛选目标用户：有火花且未续。"""

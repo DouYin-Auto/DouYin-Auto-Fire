@@ -25,6 +25,7 @@ LOG_CATEGORIES = [
     "session-save",
     "browser-ops",
     "status-check",
+    "chat-refresh",
 ]
 
 
@@ -126,13 +127,14 @@ if __name__ == "__main__":
         epilog="""
 调度参数在 config.yaml 的 schedule 节点配置。
 
-日志开关（默认全部开启）：
+日志开关（默认 See config.yaml categories）：
   --no-log-online-events    关闭上线/下线事件日志
   --no-log-send-result      关闭发送结果日志
   --no-log-schedule         关闭调度决策日志
-  --no-log-session-save     关闭 Session 保存日志
-  --no-log-browser-ops      关闭浏览器操作日志
+  --no-log-session-save     关闭 Session 保存日志（默认关闭）
+  --no-log-browser-ops      关闭浏览器操作日志（默认关闭）
   --no-log-status-check     关闭在线状态获取日志
+  --no-log-chat-refresh     关闭聊天页面刷新日志
   --no-log-console          关闭控制台输出
         """.strip(),
     )

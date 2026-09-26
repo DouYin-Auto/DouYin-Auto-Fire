@@ -35,6 +35,7 @@ ALL_CATEGORIES = (
     "session_save",
     "browser_ops",
     "status_check",
+    "chat_refresh",
 )
 
 # ANSI 颜色码
@@ -45,6 +46,7 @@ COLORS = {
     "session_save": "\033[35m",     # 紫色
     "browser_ops": "\033[34m",      # 蓝色
     "status_check": "\033[90m",     # 灰色
+    "chat_refresh": "\033[96m",     # 亮青色
 }
 RESET = "\033[0m"
 
@@ -217,6 +219,10 @@ class Logger:
     def status_check(self, message: str, success: bool = True) -> None:
         level = "INFO" if success else "ERROR"
         self._write("status_check", level, message)
+
+    def chat_refresh(self, message: str, success: bool = True) -> None:
+        level = "INFO" if success else "ERROR"
+        self._write("chat_refresh", level, message)
 
 
 # 全局单例
