@@ -26,6 +26,12 @@ build/
 *.swo
 *~
 
+# 同步临时目录
+.sync_temp_dir/
+
+# macOS Icon 文件
+Icon
+
 # 系统
 .DS_Store
 Thumbs.db
